@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: CMDB Collector - token issuing API
+  description: >
+    Issues the JWTs that the other collector APIs (such as POST /collect) require. The token is
+    signed with the collector's RS256 signing key and, when an encryption key is configured, also
+    encrypted. Only the holder of the admin token can issue tokens. This file is the contract: the
+    server interface (AuthApi) and the request / response classes are generated from it at build
+    time.
+  version: 1.0.0
+
+security:
+  - adminToken: []
+
+tags:
+  - name: Auth
+    description: Issue tokens
+
+paths:
+  /auth/token:
+    post:
+      tags: [Auth]
+      operationId: issueToken
+      summary: Issue a token for a subject with the given roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueTokenRequest'
+      responses:
+        '200':
+          description: The signed (and, when configured, encrypted) token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedToken'
+        '400':
+          description: A blank subject, no roles, a role that is not allowed, or a lifetime over the maximum
+        '401':
+          description: Missing or wrong admin token
+        '404':
+          description: Token issuing is disabled (no admin token or no signing key configured)
+
+components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: The value of COLLECTOR_ADMIN_TOKEN
+
+  schemas:
+    IssueTokenRequest:
+      type: object
+      required: [subject, roles]
+      properties:
+        subject:
+          type: string
+          description: Who or what the token is for (becomes the sub claim)
+          example: ops-pipeline
+        roles:
+          type: array
+          description: Roles to grant (the roles claim). Each must be in the configured allowed roles, for example COLLECT.
+          items:
+            type: string
+          example: [COLLECT]
+        expiresInSeconds:
+          type: integer
+          format: int64
+          description: Lifetime in seconds; the configured default when omitted, at most the configured maximum
+          example: 3600
+
+    IssuedToken:
+      type: object
+      required: [token, tokenType, subject, roles, expiresAt]
+      properties:
+        token:
+          type: string
+          description: Send it as "Authorization Bearer token"
+        tokenType:
+          type: string
+          example: Bearer
+        subject:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time

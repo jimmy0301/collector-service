@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  title: CMDB Collector - on-demand collect API
+  description: >
+    Starts a collect immediately instead of waiting for the schedule. A request returns when the
+    collect has finished. Only call it from inside the cluster. This file is the contract: the
+    server interface (CollectApi) and the response classes are generated from it at build time.
+  version: 1.0.0
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Collect
+    description: Start collects on demand
+
+paths:
+  /collect:
+    get:
+      tags: [Collect]
+      operationId: listCollectJobs
+      summary: List the sources and their jobs, in the order "all" runs them
+      responses:
+        '200':
+          description: Source name to its job names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectJobs'
+        '401':
+          description: Missing or wrong token
+        '404':
+          description: The API is disabled (no token configured)
+    post:
+      tags: [Collect]
+      operationId: collectAll
+      summary: Run every source in order (argo, then k8s, then ado)
+      responses:
+        '200':
+          description: One report per source
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TriggerReport'
+        '401':
+          description: Missing or wrong token
+        '404':
+          description: The API is disabled (no token configured)
+
+  /collect/{source}:
+    post:
+      tags: [Collect]
+      operationId: collectSource
+      summary: Run every job of one source
+      parameters:
+        - $ref: '#/components/parameters/Source'
+      responses:
+        '200':
+          description: The jobs that ran, in order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerReport'
+        '401':
+          description: Missing or wrong token
+        '404':
+          description: Unknown source, or the API is disabled (no token configured)
+        '409':
+          description: A collect of this source is already running; try again later
+
+  /collect/{source}/{job}:
+    post:
+      tags: [Collect]
+      operationId: collectJob
+      summary: Run one job of one source
+      parameters:
+        - $ref: '#/components/parameters/Source'
+        - name: job
+          in: path
+          required: true
+          description: >
+            argo - sites, clusters, applications; k8s - sites, clusters, workloads, events;
+            ado - releases.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The job that ran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TriggerReport'
+        '401':
+          description: Missing or wrong token
+        '404':
+          description: Unknown source or job, or the API is disabled (no token configured)
+        '409':
+          description: A collect of this source is already running; try again later
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque token today, JWT with the scope collect later
+      description: The value of COLLECTOR_TRIGGER_TOKEN
+
+  parameters:
+    Source:
+      name: source
+      in: path
+      required: true
+      description: argo, k8s or ado
+      schema:
+        type: string
+
+  schemas:
+    CollectJobs:
+      type: object
+      description: Source name to the names of its jobs
+      additionalProperties:
+        type: array
+        items:
+          type: string
+      example:
+        argo: [sites, clusters, applications]
+        k8s: [sites, clusters, workloads, events]
+        ado: [releases]
+
+    SyncStatus:
+      type: string
+      description: >
+        The worst status among the sync runs the job tracked (FAILED over PARTIAL over SUCCESS).
+        PARTIAL means some items failed.
+      enum: [SUCCESS, PARTIAL, FAILED]
+
+    JobReport:
+      type: object
+      required: [job, status, runs, durationMs, errors]
+      properties:
+        job:
+          type: string
+          example: applications
+        status:
+          $ref: '#/components/schemas/SyncStatus'
+        runs:
+          type: integer
+          description: >
+            How many sync runs were tracked (one per site, cluster or project). 0 means there was
+            nothing to collect (no ADO project configured, no namespace in the Argo scope), not
+            that data was collected. Details are in integration_sync_runs.
+          example: 2
+        durationMs:
+          type: integer
+          format: int64
+          example: 812
+        errors:
+          type: array
+          description: >
+            Why the runs that did not succeed failed, as "provider: reason" (at most 20), or why the
+            job itself threw (for example the integration service was unreachable). Empty when
+            everything succeeded. The full record of each run is in integration_sync_runs.
+          items:
+            type: string
+          example: ["ARGO:PLANT-A: resource-tree shop: 502 upstream down"]
+
+    TriggerReport:
+      type: object
+      required: [source, jobs]
+      properties:
+        source:
+          type: string
+          example: argo
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobReport'

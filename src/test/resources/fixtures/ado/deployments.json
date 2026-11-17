@@ -1,0 +1,39 @@
+{
+  "count": 2,
+  "value": [
+    {
+      "id": 9001,
+      "release": {"id": 310, "name": "Release-310", "url": "https://vsrm.dev.azure.com/org/p/_apis/Release/releases/310"},
+      "releaseDefinition": {"id": 7, "name": "shop-cd", "path": "\\"},
+      "releaseEnvironment": {"id": 2001, "name": "uat"},
+      "definitionEnvironmentId": 55,
+      "attempt": 1,
+      "reason": "manual",
+      "deploymentStatus": "succeeded",
+      "operationStatus": "PhaseSucceeded",
+      "requestedBy": {"displayName": "Alice Chen", "uniqueName": "alice@example.com", "id": "u-1"},
+      "requestedFor": {"displayName": "Alice Chen", "uniqueName": "alice@example.com", "id": "u-1"},
+      "queuedOn": "2026-11-14T01:00:00.000Z",
+      "startedOn": "2026-11-14T01:01:00.000Z",
+      "completedOn": "2026-11-14T01:05:00.000Z",
+      "lastModifiedOn": "2026-11-14T01:05:00.000Z",
+      "preDeployApprovals": [{"id": 1, "approver": {"displayName": "Bob"}, "status": "approved"}],
+      "postDeployApprovals": []
+    },
+    {
+      "id": 9002,
+      "release": {"id": 311, "name": "Release-311"},
+      "releaseDefinition": {"id": 7, "name": "shop-cd"},
+      "releaseEnvironment": {"id": 2002, "name": "prod"},
+      "definitionEnvironmentId": 56,
+      "attempt": 2,
+      "reason": "automated",
+      "deploymentStatus": "inProgress",
+      "operationStatus": "PhaseInProgress",
+      "requestedBy": {"displayName": "Release Bot"},
+      "queuedOn": "2026-11-14T02:00:00.000Z",
+      "startedOn": "2026-11-14T02:01:00.000Z",
+      "lastModifiedOn": "2026-11-14T02:01:30.000Z"
+    }
+  ]
+}

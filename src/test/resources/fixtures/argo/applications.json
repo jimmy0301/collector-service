@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "metadata": {"name": "shop", "namespace": "argocd", "uid": "app-uid-1", "resourceVersion": "10"},
+      "spec": {
+        "project": "default",
+        "destination": {"server": "https://k8s.plant-a:6443", "namespace": "shop"},
+        "source": {"repoURL": "https://git.example/shop-manifests", "path": "overlays/prod", "targetRevision": "main"}
+      },
+      "status": {
+        "sync": {"status": "Synced", "revision": "abc123"},
+        "health": {"status": "Healthy"},
+        "operationState": {
+          "phase": "Succeeded",
+          "message": "successfully synced (all tasks run)",
+          "startedAt": "2026-11-14T01:00:00Z",
+          "finishedAt": "2026-11-14T01:01:00Z",
+          "operation": {
+            "initiatedBy": {"username": "release-bot"},
+            "info": [{"name": "release-id", "value": "310"}]
+          },
+          "syncResult": {"revision": "abc123"}
+        }
+      }
+    }
+  ]
+}

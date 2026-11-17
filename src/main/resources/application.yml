@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: collector-service
+  datasource:
+    # dedicated collector account: PLAN.md 6.5 limited it to DML on integration_raw_events and integration_sync_runs; normalization also needs the domain tables and event_publication (to be confirmed with the DBA)
+    url: ${COLLECTOR_DB_URL:jdbc:postgresql://localhost:5432/cmdb}
+    username: ${COLLECTOR_DB_USER:collector}
+    password: ${COLLECTOR_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 5 # the shared database has a per-account connection quota
+      connection-init-sql: "SET TIME ZONE 'UTC'" # timestamp columns are timestamptz; the session is always UTC
+  flyway:
+    # Runs db/migration at startup (several replicas are safe: Flyway takes a lock). The datasource account needs DDL rights for the first run;
+    # to keep the runtime account DML-only, set SPRING_FLYWAY_USER / SPRING_FLYWAY_PASSWORD to an owner account used only for migrations.
+    # A non-empty database without flyway_schema_history is rejected on purpose (no baseline-on-migrate).
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true # a 4xx with a reason (400 token request, 404 unknown job, 409 busy) answers an RFC 9457 JSON body with the reason in "detail"
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate # Flyway (db/migration) creates the schema before JPA starts; validate that the entities still match it and fail fast if not
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          # The classpath has both Jackson 2 (brought in by Fabric8) and Jackson 3; Hibernate picks Jackson 2 by default,
+          # which cannot read tools.jackson JsonNode; specify Jackson 3 explicitly
+          json_format_mapper: org.hibernate.type.format.jackson.Jackson3JsonFormatMapper
+  task:
+    scheduling:
+      pool:
+        size: 8 # Argo 3 + K8s 4 + ADO 1 + purge and resubmit 2, so they do not block each other
+    execution:
+      pool:
+        core-size: 8 # async threads of @ApplicationModuleListener (events with the same ordering_key are serialized by a lock)
+  modulith:
+    events:
+      completion-mode: delete # delete the event_publication row once processing completes; the raw events themselves are the audit record
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+collector:
+  dedupe-cache-size: 50000
+  sync-run-retention-days: 7
+  security:
+    # Bearer token that may ask POST /auth/token for JWTs. Blank = token issuing answers 404.
+    admin-token: ${COLLECTOR_ADMIN_TOKEN:}
+    # The collector signs and verifies its own JWTs. Off by default: the token API and the collect API answer 404.
+    # When enabled, the signing keys are required (PEM files, for example from a mounted K8s Secret).
+    jwt:
+      enabled: ${COLLECTOR_JWT_ENABLED:false}
+      issuer: collector-service
+      key-id: collector-1
+      signing-private-key: ${COLLECTOR_JWT_SIGNING_PRIVATE_KEY:} # file:/keys/sign.key, RSA >= 2048 bits, PKCS#8
+      signing-public-key: ${COLLECTOR_JWT_SIGNING_PUBLIC_KEY:} # file:/keys/sign.pub
+      # Optional second RSA pair: when both are set, tokens are also encrypted and only encrypted tokens are accepted
+      encryption-private-key: ${COLLECTOR_JWT_ENCRYPTION_PRIVATE_KEY:}
+      encryption-public-key: ${COLLECTOR_JWT_ENCRYPTION_PUBLIC_KEY:}
+      default-lifetime: 1h
+      max-lifetime: 24h
+      allowed-roles: COLLECT # comma separated; the roles POST /auth/token may grant
+  argo:
+    base-url: ${ARGO_HUB_URL:}
+    token: ${ARGO_HUB_TOKEN:}
+    poll-interval: 30s # Argo keeps only the latest operationState, so interval <= 30s (INTEGRATION_API_SPEC 4.1)
+    tree-interval: 5m
+    cluster-interval: 1h
+    cluster-initial-delay: 60s # later than the K8s cluster list (20s), so clusters exist before argo_cluster_name is written
+  k8s:
+    base-url: ${K8S_HUB_URL:}
+    token: ${K8S_HUB_TOKEN:}
+    poll-interval: 60s
+    event-interval: 30s # Events are kept in the cluster for only about 1 hour
+    cluster-interval: 1h
+    page-size: 500
+  ado:
+    # Azure DevOps Release (vsrm.dev.azure.com), polled directly with a read-only PAT; nothing is polled until organization and projects are set
+    base-url: https://vsrm.dev.azure.com
+    organization: ${ADO_ORGANIZATION:}
+    projects: ${ADO_PROJECTS:} # comma separated
+    token: ${ADO_TOKEN:}
+    poll-interval: 60s
+    lookback: 7d # how far back the first poll after a start looks; a repeated fetch is a no-op
+    overlap: 5m # the watermark stays this far behind the newest modification
+    page-size: 100
+  leader-election:
+    enabled: ${LEADER_ELECTION_ENABLED:false} # enable in production with multiple replicas
+    namespace: ${POD_NAMESPACE:default}
+  normalization:
+    max-attempts: 5 # beyond this the event is marked DEAD and needs manual handling
+    resubmit-interval: 60s # the leader resubmits events whose processing did not complete (after a restart or a transient error)
+    resubmit-min-age: 60s

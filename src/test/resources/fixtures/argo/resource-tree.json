@@ -1,0 +1,7 @@
+{
+  "nodes": [
+    {"kind": "Deployment", "name": "shop", "namespace": "shop", "uid": "dep-1", "health": {"status": "Healthy"}},
+    {"kind": "ReplicaSet", "name": "shop-abc", "namespace": "shop", "uid": "rs-1",
+     "parentRefs": [{"kind": "Deployment", "name": "shop", "uid": "dep-1"}]}
+  ]
+}

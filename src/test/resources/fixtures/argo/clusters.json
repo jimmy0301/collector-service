@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"name": "in-cluster", "server": "https://kubernetes.default.svc"},
+    {"name": "plant-a", "server": "https://k8s.plant-a:6443"}
+  ]
+}

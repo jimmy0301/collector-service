@@ -1,0 +1,28 @@
+{
+  "id": 310,
+  "name": "Release-310",
+  "status": "active",
+  "reason": "continuousIntegration",
+  "createdOn": "2026-11-14T00:55:00.000Z",
+  "modifiedOn": "2026-11-14T01:05:00.000Z",
+  "createdBy": {"displayName": "Alice Chen", "uniqueName": "alice@example.com"},
+  "releaseDefinition": {"id": 7, "name": "shop-cd", "path": "\\"},
+  "variables": {"DbPassword": {"value": "hunter2", "isSecret": false}},
+  "variableGroups": [{"id": 3, "name": "secrets"}],
+  "environments": [{"id": 2001, "name": "uat", "variables": {"Token": {"value": "abc"}}}],
+  "artifacts": [
+    {
+      "alias": "_shop-ci",
+      "type": "Build",
+      "isPrimary": true,
+      "isRetained": false,
+      "definitionReference": {
+        "version": {"id": "5521", "name": "20261114.3"},
+        "branch": {"id": "refs/heads/main", "name": "main"},
+        "definition": {"id": "12", "name": "shop-ci"},
+        "repository": {"id": "r1", "name": "shop"},
+        "artifactSourceDefinitionUrl": {"id": "https://dev.azure.com/org/p/_build?definitionId=12"}
+      }
+    }
+  ]
+}
