@@ -164,10 +164,50 @@ io.cmdb.collector
 ├── inventory/      ④ 寫入：*Store（port）、Jpa*Store、SpringData*Repository、*Entity
 ├── syncrun/        每次輪詢的紀錄（資料新鮮度）與 7 天清理
 ├── leader/         K8s Lease 的 leader election（只有 leader 才輪詢與重送）
+├── security/       預設的 SecurityFilterChain、collector 自己的 JWT 金鑰、POST /auth/token 簽發與驗證
 └── http/           呼叫兩個整合服務用的 RestClient
 ```
 
 每個 context 內部再分 `domain`（介面與資料型別）/ `application`（流程）/ `infrastructure`（HTTP、資料庫、排程）。依賴方向由 ArchUnit 與 Spring Modulith 在測試中檢查。
+
+### 完整資料夾結構
+
+```
+cmdb/                                   上層目錄（設計文件與工具）
+├── PLAN.md  ARCHITECTURE.md  DATA_DICTIONARY.md  INTEGRATION_API_SPEC.md  SOURCE_MAPPING.md
+├── VERIFICATION_CHECKLIST.md / .xlsx   驗證清單
+├── CMDB簡報講稿.md  整合服務 API 需求.html
+├── tools/
+│   └── export_collector_public.py
+└── collector-service/                  本服務（pom.xml 在這裡）
+    ├── pom.xml
+    ├── README.md  CLAUDE.md  JWT_DEPLOYMENT.md
+    └── src/
+        ├── main/
+        │   ├── java/io/cmdb/collector/
+        │   │   ├── CollectorApplication.java
+        │   │   ├── <context>/                 每個 context 的根套件有 package-info.java（@BoundedContext）
+        │   │   │   ├── domain/                介面與資料型別
+        │   │   │   ├── application/           流程
+        │   │   │   └── infrastructure/        HTTP、資料庫、排程
+        │   │   │   （argo、ado、k8s、rawevent、syncrun、normalization、trigger、security 的根目錄另有 CLAUDE.md）
+        │   │   ├── inventory/
+        │   │   │   ├── domain/                依資料種類再分：argo、artifact、cluster、deployment、k8s、release、site
+        │   │   │   └── infrastructure/        Jpa*Store、SpringData*Repository、*Entity
+        │   │   ├── leader/                    只有 domain、infrastructure
+        │   │   ├── security/                  domain、application、infrastructure
+        │   │   └── http/                      HubRestClients（RestClient 工廠，沒有分層）
+        │   └── resources/
+        │       ├── application.yml
+        │       ├── openapi/                   contract first 的 API 契約：auth.yaml、trigger.yaml
+        │       └── db/migration/              Flyway：V1__init.sql（全部 DDL，不入版控，需另外取得）
+        └── test/
+            ├── java/io/cmdb/collector/
+            │   ├── <context>/…                與 main 的 package 一對一：XTest（單元）、XIT（碰資料庫）
+            │   └── support/                   DatabaseTest、PostgresIntegrationTest、PipelineTest、SharedPostgres、
+            │                                  Fakes、Fixtures、TestPayloads、TestKeys
+            └── resources/fixtures/            WireMock 回應內容，依整合服務分：ado、argo、k8s
+```
 
 ### 想了解某件事，從這裡開始讀
 
@@ -227,7 +267,7 @@ mvn verify   # 同上，再加 spotless 格式檢查與打包
 mvn test -Dtest='*Test'   # 只跑不需要 Docker 的單元測試
 ```
 
-**資料庫 schema**：由這個服務的 Flyway 在啟動時自動建立與升級（`src/main/resources/db/migration`，`V1__init.sql` 是全部 DDL），不需要事先手動執行 SQL。連線帳號第一次啟動需要有建表權限；若想讓執行用的帳號只有讀寫權限，另設 `SPRING_FLYWAY_USER`、`SPRING_FLYWAY_PASSWORD`（只用於 migration 的帳號）。已有表但沒有 `flyway_schema_history` 的非空資料庫會被拒絕（刻意不自動 baseline）。第一次部署前 V1 可以修改；部署後每個變更都要新增 `V2__…sql`，不要改已套用的檔案。
+**資料庫 schema**：由這個服務的 Flyway 在啟動時自動建立與升級（`src/main/resources/db/migration`，`V1__init.sql` 是全部 DDL），不需要事先手動執行 SQL。**這個 repo 不含 `V1__init.sql`（schema 不入版控）**，需另外取得並放到 `src/main/resources/db/migration/`，否則應用程式與整合測試（`mvn test`、`mvn verify` 中的 `*IT`）無法建立 schema。連線帳號第一次啟動需要有建表權限；若想讓執行用的帳號只有讀寫權限，另設 `SPRING_FLYWAY_USER`、`SPRING_FLYWAY_PASSWORD`（只用於 migration 的帳號）。已有表但沒有 `flyway_schema_history` 的非空資料庫會被拒絕（刻意不自動 baseline）。第一次部署前 V1 可以修改；部署後每個變更都要新增 `V2__…sql`，不要改已套用的檔案。
 
 整合測試用 Testcontainers 的空 PostgreSQL，schema 由 Flyway 的 `db/migration` 建立（和正式環境同一份），容器整個 JVM 共用一個。ByteBuddy plugin 綁在 `process-classes`，只跑 `mvn compile` 不會轉換 entity。
 
@@ -240,4 +280,4 @@ mvn test -Dtest='*Test'   # 只跑不需要 Docker 的單元測試
 - 非同步執行緒池的佇列沒有上限。
 - collector 的資料庫帳號需要 domain 表與 `event_publication` 的寫入權限，要和 DBA 確認。
 
-更多設計背景見上層目錄的 `PLAN.md`、`ARCHITECTURE.md`、`collector-service/src/main/resources/db/migration/V1__init.sql`（DDL）、`INTEGRATION_API_SPEC.md`，以及各 context 內的 `CLAUDE.md`。
+更多設計背景見上層目錄的 `PLAN.md`、`ARCHITECTURE.md`、`V1__init.sql`（DDL，不入版控，需另外取得）、`INTEGRATION_API_SPEC.md`，以及各 context 內的 `CLAUDE.md`。
