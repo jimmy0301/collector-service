@@ -200,7 +200,7 @@ cmdb/                                   上層目錄（設計文件與工具）
         │   └── resources/
         │       ├── application.yml
         │       ├── openapi/                   contract first 的 API 契約：auth.yaml、trigger.yaml
-        │       └── db/migration/              Flyway：V1__init.sql（全部 DDL，不入版控，需另外取得）
+        │       └── db/migration/              Flyway：V1__init.sql（全部 DDL）
         └── test/
             ├── java/io/cmdb/collector/
             │   ├── <context>/…                與 main 的 package 一對一：XTest（單元）、XIT（碰資料庫）
@@ -267,7 +267,7 @@ mvn verify   # 同上，再加 spotless 格式檢查與打包
 mvn test -Dtest='*Test'   # 只跑不需要 Docker 的單元測試
 ```
 
-**資料庫 schema**：由這個服務的 Flyway 在啟動時自動建立與升級（`src/main/resources/db/migration`，`V1__init.sql` 是全部 DDL），不需要事先手動執行 SQL。**這個 repo 不含 `V1__init.sql`（schema 不入版控）**，需另外取得並放到 `src/main/resources/db/migration/`，否則應用程式與整合測試（`mvn test`、`mvn verify` 中的 `*IT`）無法建立 schema。連線帳號第一次啟動需要有建表權限；若想讓執行用的帳號只有讀寫權限，另設 `SPRING_FLYWAY_USER`、`SPRING_FLYWAY_PASSWORD`（只用於 migration 的帳號）。已有表但沒有 `flyway_schema_history` 的非空資料庫會被拒絕（刻意不自動 baseline）。第一次部署前 V1 可以修改；部署後每個變更都要新增 `V2__…sql`，不要改已套用的檔案。
+**資料庫 schema**：由這個服務的 Flyway 在啟動時自動建立與升級（`src/main/resources/db/migration`，`V1__init.sql` 是全部 DDL），不需要事先手動執行 SQL。連線帳號第一次啟動需要有建表權限；若想讓執行用的帳號只有讀寫權限，另設 `SPRING_FLYWAY_USER`、`SPRING_FLYWAY_PASSWORD`（只用於 migration 的帳號）。已有表但沒有 `flyway_schema_history` 的非空資料庫會被拒絕（刻意不自動 baseline）。第一次部署前 V1 可以修改；部署後每個變更都要新增 `V2__…sql`，不要改已套用的檔案。
 
 整合測試用 Testcontainers 的空 PostgreSQL，schema 由 Flyway 的 `db/migration` 建立（和正式環境同一份），容器整個 JVM 共用一個。ByteBuddy plugin 綁在 `process-classes`，只跑 `mvn compile` 不會轉換 entity。
 
@@ -280,4 +280,4 @@ mvn test -Dtest='*Test'   # 只跑不需要 Docker 的單元測試
 - 非同步執行緒池的佇列沒有上限。
 - collector 的資料庫帳號需要 domain 表與 `event_publication` 的寫入權限，要和 DBA 確認。
 
-更多設計背景見上層目錄的 `PLAN.md`、`ARCHITECTURE.md`、`V1__init.sql`（DDL，不入版控，需另外取得）、`INTEGRATION_API_SPEC.md`，以及各 context 內的 `CLAUDE.md`。
+更多設計背景見上層目錄的 `PLAN.md`、`ARCHITECTURE.md`、`collector-service/src/main/resources/db/migration/V1__init.sql`（DDL）、`INTEGRATION_API_SPEC.md`，以及各 context 內的 `CLAUDE.md`。

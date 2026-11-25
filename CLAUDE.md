@@ -1,6 +1,6 @@
 # collector-service
 
-CMDB 的擷取與整合服務：**主動往外拉**資料（Azure 無法連入公司網路，不用任何 webhook）、落地為 raw event、再正規化寫入 domain 表。技術：Java 21、Spring Boot 4.1.2、Spring Modulith 2.1.2、jMolecules（DDD + Onion）、Spring Data JPA、PostgreSQL。設計文件在上層目錄：`PLAN.md`、`ARCHITECTURE.md`、`DATA_DICTIONARY.md`、`INTEGRATION_API_SPEC.md`；DDL 在 `src/main/resources/db/migration/V1__init.sql`（Flyway），但**不入版控**，需另外取得放入該目錄，否則應用程式與整合測試（`*IT`）無法建立 schema。
+CMDB 的擷取與整合服務：**主動往外拉**資料（Azure 無法連入公司網路，不用任何 webhook）、落地為 raw event、再正規化寫入 domain 表。技術：Java 21、Spring Boot 4.1.2、Spring Modulith 2.1.2、jMolecules（DDD + Onion）、Spring Data JPA、PostgreSQL。設計文件在上層目錄：`PLAN.md`、`ARCHITECTURE.md`、`DATA_DICTIONARY.md`、`INTEGRATION_API_SPEC.md`；DDL 在 `src/main/resources/db/migration/V1__init.sql`（Flyway）。
 
 ## 建置與測試
 
@@ -68,7 +68,7 @@ normalization ──▶ rawevent, inventory, leader        rawevent ──RawEve
 - 冪等寫入不用 `save()`，用原生 `INSERT … ON CONFLICT`；舊資料不得覆蓋新資料（`observed_at`）。
 - 時間欄位 `TIMESTAMPTZ`、程式用 `Instant`；連線 `SET TIME ZONE 'UTC'`。
 - Hibernate 的 JSON mapper 已指定 `Jackson3JsonFormatMapper`（`application.yml`）。
-- schema 由這個服務的 Flyway 建立與升級（`src/main/resources/db/migration`，V1 = 全部 DDL，不入版控、需另外取得；啟動時自動套用）；`ddl-auto: validate` 只檢查 entity 與 schema 一致。第一次部署前 V1 可以修改；部署後每個變更都要新增 V2、V3… 檔案，不要改已套用的檔案。連線帳號需有建表權限，或用 `SPRING_FLYWAY_USER` / `SPRING_FLYWAY_PASSWORD` 另給只用於 migration 的帳號。
+- schema 由這個服務的 Flyway 建立與升級（`src/main/resources/db/migration`，V1 = 全部 DDL，啟動時自動套用）；`ddl-auto: validate` 只檢查 entity 與 schema 一致。第一次部署前 V1 可以修改；部署後每個變更都要新增 V2、V3… 檔案，不要改已套用的檔案。連線帳號需有建表權限，或用 `SPRING_FLYWAY_USER` / `SPRING_FLYWAY_PASSWORD` 另給只用於 migration 的帳號。
 
 ## 尚未做
 
